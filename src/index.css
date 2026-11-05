@@ -1,0 +1,69 @@
+@import "@fontsource-variable/public-sans/index.css";
+@import "tailwindcss" source(".");
+
+/* Design tokens from the Stitch "Utilitarian Examination Console" system. */
+@theme {
+  --font-sans: "Public Sans Variable", system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, Consolas, monospace;
+
+  --color-navy: #12375f;
+  --color-navy-deep: #0a223d;
+  --color-action: #1a5fb4;
+  --color-action-deep: #134585;
+  --color-action-wash: #e8f0fe;
+  --color-page: #f7f9ff;
+  --color-panel: #f1f3f4;
+  --color-subbar: #e8eaed;
+  --color-line: #c6c9cc;
+  --color-line-soft: #dadce0;
+  --color-ink: #181c20;
+  --color-ink-2: #43474e;
+  --color-ink-3: #5f6368;
+  --color-ans: #1e8e3e;
+  --color-ans-deep: #146c2e;
+  --color-nans: #d93025;
+  --color-mark: #6a3fb5;
+  --color-nv: #d5d7da;
+  --color-warn: #f28c00;
+  --color-amber: #b26a00;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 1px;
+}
+
+button:not(:disabled),
+label[for],
+summary {
+  cursor: pointer;
+}
+
+/* Non-colour cue for the official palette states, as on the real console. */
+.shape-answered {
+  clip-path: polygon(0 18%, 18% 0, 82% 0, 100% 18%, 100% 100%, 0 100%);
+}
+.shape-not-answered {
+  clip-path: polygon(0 0, 100% 0, 100% 82%, 82% 100%, 18% 100%, 0 82%);
+}
+
+/* Chart and diagram text stays crisp and aligned. */
+.viz text {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,14 @@
+node_modules
+dist
+dev-dist
+*.local
+
+# Python
+__pycache__/
+*.pyc
+rrb_mock_generator/out/
+
+# Kept on disk but not published: large PDFs, a private build brief, and a copy of data/'s question bank.
+rrb_mock_generator/*.pdf
+rrb_mock_generator/PLATFORM_BUILD_PROMPT.md
+rrb_mock_generator/rrb_po_prelims_20_mocks.json
