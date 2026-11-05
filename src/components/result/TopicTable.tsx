@@ -15,6 +15,8 @@ function Flags({ row }: { row: GroupRow }) {
 
 function Cells({ row }: { row: GroupRow }) {
   const cell = 'border border-line px-2 py-1 text-center';
+  // A section opens its first question by itself, so a topic can log a moment with no real time spent.
+  const spentTime = row.avgTimeMs >= 500;
   return (
     <>
       <td className={cell}>
@@ -25,9 +27,9 @@ function Cells({ row }: { row: GroupRow }) {
         {row.attempted ? `${row.accuracy.toFixed(0)}%` : '–'}
       </td>
       <td className={`${cell} ${row.slow ? 'font-semibold text-amber' : ''}`}>
-        {row.avgTimeMs ? formatDuration(row.avgTimeMs) : '–'}
+        {spentTime ? formatDuration(row.avgTimeMs) : '–'}
       </td>
-      <td className={cell}>{row.targetMs ? formatDuration(row.targetMs) : '–'}</td>
+      <td className={cell}>{spentTime ? formatDuration(row.targetMs) : '–'}</td>
     </>
   );
 }

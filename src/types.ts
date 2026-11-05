@@ -156,7 +156,14 @@ export interface Attempt {
   startedAt: number;
   submittedAt: number | null;
   submitReason: 'manual' | 'timeout' | null;
-  /** Timer checkpoint: time left at checkpointAt. */
+  /**
+   * Seconds per section when each has its own clock, in paper order. Null or absent means one clock
+   * for the whole paper: drills, and mocks begun before sections were timed.
+   */
+  sectionLimitsSec?: number[] | null;
+  /** Which section's clock is running. */
+  activeSection?: number;
+  /** Timer checkpoint: time left on the running clock at checkpointAt. */
   remainingMs: number;
   checkpointAt: number;
   activeQid: string | null;

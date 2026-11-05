@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { checkpointAttempt, saveExamDelta, submitAttempt, type LoadedAttempt } from '../../data/attemptStore';
 import { softBeep } from '../../lib/beep';
+import { restoreExamState } from './restoreExamState';
 import {
   clearResponse,
   goNext,
   goPrevious,
   goTo,
+  hasNextStage,
   markAndNext,
-  resumeExam,
   saveAndNext,
   selectOption,
-  startExam,
+  startNextStage,
   type Clock,
   type ExamState,
 } from '../../lib/examState';
@@ -32,6 +33,8 @@ export interface ExamSession {
   state: ExamState;
   clock: ClockStore;
   paused: boolean;
+  /** Says what happened when a section's time ran out, until the next action. */
+  notice: string | null;
   actions: {
     select: (option: number) => void;
     saveNext: () => void;
@@ -43,25 +46,6 @@ export interface ExamSession {
     togglePause: () => void;
     submit: () => void;
   };
-}
-
-function initialState(loaded: LoadedAttempt, clock: Clock): ExamState {
-  const { attempt, paper, responses } = loaded;
-  const order = paper.items.map((i) => i.q.id);
-  if (attempt.activeQid === null) return startExam(order, clock);
-  return resumeExam(
-    order,
-    {
-      progress: responses,
-      activeQid: attempt.activeQid,
-      visitStartRemainingMs: attempt.visitStartRemainingMs,
-      visitEnteredAt: attempt.visitEnteredAt,
-      nextVisitSeq: attempt.nextVisitSeq,
-      remainingMs: attempt.remainingMs,
-      checkpointAt: attempt.checkpointAt,
-    },
-    clock,
-  );
 }
 
 /**
@@ -79,11 +63,12 @@ export function useExamSession(
   const timer = useRef<TimerState>(createTimer(attempt.remainingMs));
   const clock = useMemo(() => createClockStore(attempt.remainingMs), [attempt.remainingMs]);
   const [state, setState] = useState<ExamState>(() =>
-    initialState(loaded, { now: Date.now(), remainingMs: attempt.remainingMs }),
+    restoreExamState(loaded, { now: Date.now(), remainingMs: attempt.remainingMs }),
   );
   const stateRef = useRef(state);
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const finished = useRef(false);
   const savedVisits = useRef(0);
   const writes = useRef<Promise<unknown>>(Promise.resolve());
@@ -111,6 +96,7 @@ export function useExamSession(
             remainingMs: at.remainingMs,
             checkpointAt: at.now,
             activeQid: next.order[next.activeIndex],
+            activeSection: next.activeStage,
             visitStartRemainingMs: next.visitStartRemainingMs,
             visitEnteredAt: next.visitEnteredAt,
             nextVisitSeq: next.nextVisitSeq,
@@ -135,9 +121,33 @@ export function useExamSession(
       if (next === prev) return;
       stateRef.current = next;
       setState(next);
+      setNotice(null);
       persist(prev, next, at);
     },
     [persist, readClock],
+  );
+
+  /** Hands over to the next section's own clock. Unused time on the old clock is not carried over. */
+  const moveToNextSection = useCallback(
+    (reason: 'manual' | 'timeout') => {
+      if (finished.current) return;
+      const prev = stateRef.current;
+      const stage = prev.activeStage + 1;
+      const now = Date.now();
+      const opening = { now, remainingMs: (attempt.sectionLimitsSec?.[stage] ?? 0) * 1000 };
+      const next = startNextStage(prev, { now, remainingMs: remainingAt(timer.current, now) }, opening);
+      timer.current = startTimer(createTimer(opening.remainingMs), now);
+      clock.set(opening.remainingMs);
+      stateRef.current = next;
+      setState(next);
+      setNotice(
+        reason === 'timeout'
+          ? `Time is up for ${paper.sections[prev.activeStage].name}. You are now in ${paper.sections[stage].name}.`
+          : null,
+      );
+      persist(prev, next, opening);
+    },
+    [attempt.sectionLimitsSec, clock, paper.sections, persist],
   );
 
   const finish = useCallback(
@@ -177,8 +187,12 @@ export function useExamSession(
       clock.set(at.remainingMs);
       if (crossedCritical(previousMs, at.remainingMs) && beepOn.current) softBeep();
       previousMs = at.remainingMs;
-      if (at.remainingMs <= 0) finish('timeout');
-      else if (at.now - lastCheckpoint >= CHECKPOINT_MS) checkpoint();
+      if (at.remainingMs <= 0) {
+        if (hasNextStage(stateRef.current)) moveToNextSection('timeout');
+        else finish('timeout');
+      } else if (at.now - lastCheckpoint >= CHECKPOINT_MS) {
+        checkpoint();
+      }
     };
 
     tick();
@@ -195,7 +209,7 @@ export function useExamSession(
       checkpoint();
       timer.current = pauseTimer(timer.current, Date.now());
     };
-  }, [attemptId, clock, enqueue, finish, readClock]);
+  }, [attemptId, clock, enqueue, finish, moveToNextSection, readClock]);
 
   const togglePause = useCallback(() => {
     if (finished.current) return;
@@ -216,10 +230,13 @@ export function useExamSession(
       previous: () => apply(goPrevious),
       goToIndex: (index) => apply((s, at) => goTo(s, index, at)),
       togglePause,
-      submit: () => finish('manual'),
+      submit: () => {
+        if (hasNextStage(stateRef.current)) moveToNextSection('manual');
+        else finish('manual');
+      },
     }),
-    [apply, finish, togglePause],
+    [apply, finish, moveToNextSection, togglePause],
   );
 
-  return { state, clock, paused, actions };
+  return { state, clock, paused, notice, actions };
 }

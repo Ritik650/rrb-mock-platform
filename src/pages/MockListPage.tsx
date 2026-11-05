@@ -28,7 +28,7 @@ export function MockListPage() {
         <>
           <div className="flex h-8 items-center gap-4 border-b border-line bg-[#f1f4fa] px-4 text-xs">
             <span className="font-bold">{data.mocks.length} mocks</span>
-            <span className="text-ink-2">80 questions · 45 minutes · +1 / −0.25 · no sectional timing</span>
+            <span className="text-ink-2">80 questions · Reasoning 25 min, then Quantitative Aptitude 20 min · +1 / −0.25</span>
           </div>
           <div className="mx-auto grid max-w-[1240px] grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
             {data.mocks.map((mock) => {

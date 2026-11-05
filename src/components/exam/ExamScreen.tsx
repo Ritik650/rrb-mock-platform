@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { LoadedAttempt } from '../../data/attemptStore';
-import { hasUnsavedDraft } from '../../lib/examState';
+import { hasNextStage, hasUnsavedDraft } from '../../lib/examState';
 import type { Settings } from '../../types';
 import { Button, Kbd } from '../common/ui';
 import { ExamTopBar, SectionTabs } from './ExamTopBar';
@@ -18,7 +18,7 @@ interface Props {
 
 export function ExamScreen({ loaded, settings, onFinished }: Props) {
   const { paper } = loaded;
-  const { state, clock, paused, actions } = useExamSession(loaded, settings.beepEnabled, onFinished);
+  const { state, clock, paused, notice, actions } = useExamSession(loaded, settings.beepEnabled, onFinished);
   const [confirming, setConfirming] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const lastInSection = useRef(new Map<string, number>());
@@ -27,6 +27,15 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
   lastInSection.current.set(item.section, item.index);
   const section = paper.sections.find((s) => s.name === item.section) ?? paper.sections[0];
   const unsaved = hasUnsavedDraft(state);
+  const sectional = state.ranges.length > 1;
+  const firstInRange = state.ranges[state.activeStage].start;
+  const nextSection = hasNextStage(state) ? paper.sections[state.activeStage + 1] : null;
+
+  // A section's time can run out while its dialog is open. The dialog no longer applies then.
+  useEffect(() => {
+    setConfirming(false);
+    setDrawerOpen(false);
+  }, [state.activeStage]);
 
   useExamKeys(actions, !confirming && !paused);
 
@@ -53,11 +62,23 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
         title={paper.title}
         candidate={settings.candidateName}
         clock={clock}
+        timerLabel={sectional ? 'Section time left' : 'Time left'}
         allowPause={settings.allowPause}
         paused={paused}
         onTogglePause={actions.togglePause}
       />
-      <SectionTabs sections={paper.sections} activeSection={item.section} onSelect={openSection} />
+      <SectionTabs
+        sections={paper.sections}
+        activeSection={item.section}
+        onSelect={openSection}
+        limitsSec={sectional ? loaded.attempt.sectionLimitsSec : null}
+        runningIndex={state.activeStage}
+      />
+      {notice && (
+        <p role="status" className="shrink-0 border-b border-amber bg-[#fff4e0] px-3 py-1 text-[13px] font-medium">
+          {notice}
+        </p>
+      )}
 
       {paused ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 bg-panel">
@@ -82,9 +103,9 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
                   Mark for Review &amp; Next<Kbd>M</Kbd>
                 </Button>
                 <Button variant="danger" onClick={actions.clear}>
-                  Clear Response<Kbd>Shift+C</Kbd>
+                  Clear Response<Kbd>C</Kbd>
                 </Button>
-                <Button onClick={actions.previous} disabled={state.activeIndex === 0}>
+                <Button onClick={actions.previous} disabled={state.activeIndex === firstInRange}>
                   Previous<Kbd>←</Kbd>
                 </Button>
                 <Button onClick={actions.next}>
@@ -117,7 +138,7 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
             <Palette section={section} activeQid={item.q.id} progress={state.progress} onPick={pick} />
             <div className="shrink-0 border-t border-line p-2">
               <Button variant="submit" className="w-full" onClick={() => setConfirming(true)}>
-                Submit
+                {nextSection ? 'Submit section' : 'Submit'}
               </Button>
             </div>
           </aside>
@@ -129,8 +150,12 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
           paper={paper}
           progress={state.progress}
           unsavedQuestionNo={unsaved ? item.displayNo : null}
+          moveOn={nextSection ? { section, next: nextSection } : null}
           onCancel={() => setConfirming(false)}
-          onConfirm={actions.submit}
+          onConfirm={() => {
+            setConfirming(false);
+            actions.submit();
+          }}
         />
       )}
     </div>

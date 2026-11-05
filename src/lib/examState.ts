@@ -19,8 +19,17 @@ export interface VisitLogEntry {
   durationMs: number;
 }
 
+/** A run of questions sharing one clock, as indexes into the paper. `end` is exclusive. */
+export interface QuestionRange {
+  start: number;
+  end: number;
+}
+
 export interface ExamState {
   order: string[];
+  /** One range per clock: a single range for the whole paper, or one per timed section. */
+  ranges: QuestionRange[];
+  activeStage: number;
   activeIndex: number;
   draft: number | null;
   progress: Record<string, QuestionProgress>;
@@ -103,12 +112,16 @@ export function closeVisit(s: ExamState, clock: Clock): ExamState {
   };
 }
 
-export function startExam(order: string[], clock: Clock): ExamState {
+const wholePaper = (order: string[]): QuestionRange[] => [{ start: 0, end: order.length }];
+
+export function startExam(order: string[], clock: Clock, ranges = wholePaper(order)): ExamState {
   const progress: Record<string, QuestionProgress> = {};
   for (const qid of order) progress[qid] = blankProgress();
   return openVisit(
     {
       order,
+      ranges,
+      activeStage: 0,
       activeIndex: 0,
       draft: null,
       progress,
@@ -128,18 +141,21 @@ export interface SavedExam {
   visitStartRemainingMs: number;
   visitEnteredAt: number;
   nextVisitSeq: number;
+  activeStage?: number;
   /** The last checkpoint: where the interrupted visit stopped. */
   remainingMs: number;
   checkpointAt: number;
 }
 
 /** Rebuilds a session after a reload: ends the interrupted visit at its last checkpoint, then reopens. */
-export function resumeExam(order: string[], saved: SavedExam, clock: Clock): ExamState {
+export function resumeExam(order: string[], saved: SavedExam, clock: Clock, ranges = wholePaper(order)): ExamState {
   const progress: Record<string, QuestionProgress> = {};
   for (const qid of order) progress[qid] = saved.progress[qid] ?? blankProgress();
   const index = Math.max(0, order.indexOf(saved.activeQid));
   const interrupted: ExamState = {
     order,
+    ranges,
+    activeStage: Math.min(saved.activeStage ?? 0, ranges.length - 1),
     activeIndex: index,
     draft: null,
     progress,
@@ -153,12 +169,32 @@ export function resumeExam(order: string[], saved: SavedExam, clock: Clock): Exa
 }
 
 export function goTo(s: ExamState, index: number, clock: Clock): ExamState {
-  if (index === s.activeIndex || index < 0 || index >= s.order.length) return s;
+  const { start, end } = s.ranges[s.activeStage];
+  if (index === s.activeIndex || index < start || index >= end) return s;
   return openVisit(closeVisit(s, clock), index, clock);
 }
 
-export const goNext = (s: ExamState, clock: Clock) => goTo(s, (s.activeIndex + 1) % s.order.length, clock);
+/** Moves on, returning to the first question of the range after its last. */
+export function goNext(s: ExamState, clock: Clock): ExamState {
+  const { start, end } = s.ranges[s.activeStage];
+  const next = s.activeIndex + 1;
+  return goTo(s, next < end ? next : start, clock);
+}
+
 export const goPrevious = (s: ExamState, clock: Clock) => goTo(s, s.activeIndex - 1, clock);
+
+export const hasNextStage = (s: ExamState) => s.activeStage + 1 < s.ranges.length;
+
+/**
+ * Ends the running section and opens the next one's first question. The visit in progress closes on
+ * the old clock and the new one opens on the new clock, so time still adds up across the change.
+ * An unsaved selection is discarded, like any other way of leaving a question.
+ */
+export function startNextStage(s: ExamState, endOfStage: Clock, startOfNext: Clock): ExamState {
+  if (!hasNextStage(s)) return s;
+  const activeStage = s.activeStage + 1;
+  return openVisit({ ...closeVisit(s, endOfStage), activeStage }, s.ranges[activeStage].start, startOfNext);
+}
 
 export function selectOption(s: ExamState, option: number): ExamState {
   return s.draft === option ? s : { ...s, draft: option };

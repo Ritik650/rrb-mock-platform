@@ -37,20 +37,24 @@ keep a copy.
 
 ## Exam behaviour worth knowing
 
+- **Each section has its own clock.** Reasoning Ability gets 25 minutes, then Quantitative Aptitude gets 20. At 0:00 the
+  test moves on by itself and you cannot go back. Submit section leaves early, and the time left is not added to the next
+  section. The timer colours and the beep apply to each section's clock. Imported papers with other sections or durations
+  run on one clock, and so do topic drills, where you can also switch sections freely.
 - **Selections are drafts, as on the real console.** An answer counts only after Save & Next or Mark for Review & Next.
-  Moving away any other way discards it, and this includes Next, Previous, the palette and a section tab. The screen
-  warns you while a selection is unsaved. An unsaved selection also does not count when you submit or when time runs out.
-- **Keyboard:** 1-5 or A-E choose an option, N is Save & Next, M is Mark & Next, ← and → navigate, and **Shift+C** is
-  Clear Response. Plain C is option (c), so that a stray keypress cannot wipe a saved answer.
+  Moving away any other way discards it. The screen warns you while a selection is unsaved. An unsaved selection also
+  does not count when you submit or when time runs out.
+- **Keyboard:** 1-5 or A, B, D, E choose an option, **C is Clear Response**, N is Save & Next, M is Mark & Next, and ← and
+  → navigate. C cannot also choose option (c), so use 3 for that.
 - **The clock runs only while the test is open.** Closing the tab freezes it, and reopening resumes from the time left.
 
 ## How the analysis is worked out
 
 - **Average time** is all your time in a topic divided by the questions you answered there, so a long read you abandoned
   still counts against you. If you answered none, it divides by the questions you spent time on.
-- **Suggested attempt order** ranks topics by expected marks per minute across all finished attempts:
-  (accuracy × 1 − (1 − accuracy) × 0.25) ÷ your minutes per question. Topics with no history assume 70% accuracy at
-  target time.
+- **Suggested attempt order** ranks topics within each section by expected marks per minute across all finished
+  attempts: (accuracy × 1 − (1 − accuracy) × 0.25) ÷ your minutes per question. Topics with no history assume 70%
+  accuracy at target time.
 - **Topic drills** rank a question by its latest answer: wrong first, then never seen, then skipped, then correct.
 
 ## Where things are

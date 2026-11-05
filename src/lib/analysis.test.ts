@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attemptOrder, idealOrder, timeSinks, topicTable } from './analysis';
+import { attemptOrder, idealOrder, idealOrderGroups, timeSinks, topicTable } from './analysis';
 import { paperFromBlocks } from './paper';
 import { summarize } from './scoring';
 import { makeQuestion } from '../test/bundle';
@@ -167,5 +167,37 @@ describe('ideal order', () => {
     expect(fast.accuracy).toBe(50);
     expect(fast.secPerQuestion).toBe(60);
     expect(fast.expectedPerQuestion).toBeCloseTo(0.375);
+  });
+});
+
+describe('ideal order with section clocks', () => {
+  const qs = [
+    makeQuestion(1, { topic: 'Puzzle', sub: 's', section: 'Reasoning Ability', time: 30, ans: 0 }),
+    makeQuestion(2, { topic: 'Syllogism', sub: 's', section: 'Reasoning Ability', time: 30, ans: 0 }),
+    makeQuestion(3, { topic: 'Series', sub: 's', section: 'Quantitative Aptitude', time: 30, ans: 0 }),
+  ];
+  const paper = paperOf(qs);
+  const history = [
+    summarize(paper, {
+      'T-Q1': done(0, 120_000), // slow
+      'T-Q2': done(0, 30_000), // quick
+      'T-Q3': done(0, 10_000), // the quickest of all, but in the later section
+    }),
+  ];
+
+  it('ranks within each section, in paper order, so the plan can be followed', () => {
+    const groups = idealOrderGroups(paper, history, true);
+    expect(groups.map((g) => [g.section, g.rows.map((r) => r.topic)])).toEqual([
+      ['Reasoning Ability', ['Syllogism', 'Puzzle']],
+      ['Quantitative Aptitude', ['Series']],
+    ]);
+  });
+
+  it('keeps one ranking across the paper when sections can be mixed', () => {
+    const groups = idealOrderGroups(paper, history, false);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].section).toBeNull();
+    expect(groups[0].rows.map((r) => r.topic)).toEqual(['Series', 'Syllogism', 'Puzzle']);
+    expect(groups[0].rows).toEqual(idealOrder(paper, history));
   });
 });

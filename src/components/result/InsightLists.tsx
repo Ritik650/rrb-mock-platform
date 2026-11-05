@@ -1,4 +1,4 @@
-import type { IdealRow, TimeSink } from '../../lib/analysis';
+import type { IdealGroup, TimeSink } from '../../lib/analysis';
 import { formatDuration } from '../../lib/format';
 import type { Outcome } from '../../lib/scoring';
 
@@ -38,32 +38,38 @@ export function TimeSinkList({ sinks, attemptId }: { sinks: TimeSink[]; attemptI
   );
 }
 
-export function IdealOrderList({ rows }: { rows: IdealRow[] }) {
+export function IdealOrderList({ groups }: { groups: IdealGroup[] }) {
   return (
-    <div>
-      <ol className="divide-y divide-line border border-line bg-white">
-        {rows.map((r, i) => (
-          <li key={r.topic} className="flex items-center gap-2 px-2 py-1.5 text-[13px]">
-            <span className="w-5 shrink-0 text-right font-semibold text-ink-2 tabular-nums">{i + 1}.</span>
-            <span className="min-w-0 flex-1">
-              <span className="font-medium">{r.topic}</span>{' '}
-              <span className="text-xs text-ink-2">
-                {r.questions} Q
-                {r.hasHistory
-                  ? ` · ${r.accuracy.toFixed(0)}% · ${formatDuration(r.secPerQuestion * 1000)} per Q`
-                  : ' · no history yet'}
-              </span>
-            </span>
-            {r.expectedPerQuestion <= 0 && (
-              <span className="border border-nans px-1 text-[10px] font-semibold text-nans">Skip unless sure</span>
-            )}
-            <span className="shrink-0 font-semibold tabular-nums">{r.marksPerMinute.toFixed(2)}/min</span>
-          </li>
-        ))}
-      </ol>
-      <p className="mt-1 text-xs text-ink-2">
+    <div className="space-y-2">
+      {groups.map((group) => (
+        <div key={group.section ?? 'all'} data-ideal-group={group.section ?? 'all'}>
+          {group.section && <h3 className="mb-1 text-xs font-semibold text-ink-2">{group.section}</h3>}
+          <ol className="divide-y divide-line border border-line bg-white">
+            {group.rows.map((r, i) => (
+              <li key={r.topic} className="flex items-center gap-2 px-2 py-1.5 text-[13px]">
+                <span className="w-5 shrink-0 text-right font-semibold text-ink-2 tabular-nums">{i + 1}.</span>
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{r.topic}</span>{' '}
+                  <span className="text-xs text-ink-2">
+                    {r.questions} Q
+                    {r.hasHistory
+                      ? ` · ${r.accuracy.toFixed(0)}% · ${formatDuration(r.secPerQuestion * 1000)} per Q`
+                      : ' · no history yet'}
+                  </span>
+                </span>
+                {r.expectedPerQuestion <= 0 && (
+                  <span className="border border-nans px-1 text-[10px] font-semibold text-nans">Skip unless sure</span>
+                )}
+                <span className="shrink-0 font-semibold tabular-nums">{r.marksPerMinute.toFixed(2)}/min</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
+      <p className="text-xs text-ink-2">
         Expected marks per minute from all your finished attempts. Topics with no history assume 70% accuracy at target
         time.
+        {groups.some((g) => g.section) && ' Sections run in a fixed order, so the ranking restarts in each one.'}
       </p>
     </div>
   );

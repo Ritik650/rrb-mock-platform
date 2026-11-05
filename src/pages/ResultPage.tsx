@@ -7,7 +7,7 @@ import { ScoreHero, SectionTable } from '../components/result/ScoreSummary';
 import { TopicTable } from '../components/result/TopicTable';
 import { loadAttempt, submittedAttempts } from '../data/attemptStore';
 import { useSettings } from '../data/settings';
-import { attemptOrder, idealOrder, timeSinks, topicTable } from '../lib/analysis';
+import { attemptOrder, idealOrderGroups, timeSinks, topicTable } from '../lib/analysis';
 import { formatDate } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
 import { navigate } from '../router';
@@ -33,7 +33,7 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
       topics: topicTable(paper, responses),
       sinks: timeSinks(paper, responses),
       order: attemptOrder(paper, responses, visits),
-      ideal: idealOrder(paper, summaries),
+      ideal: idealOrderGroups(paper, summaries, Boolean(data.loaded.attempt.sectionLimitsSec)),
     };
   }, [data]);
 
@@ -67,7 +67,11 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
 
           <section>
             <SectionTitle>Score by section</SectionTitle>
-            <SectionTable overall={analysis.summary.overall} sections={analysis.summary.sections} />
+            <SectionTable
+              overall={analysis.summary.overall}
+              sections={analysis.summary.sections}
+              limitsSec={data.loaded.attempt.sectionLimitsSec}
+            />
           </section>
 
           <section>
@@ -87,7 +91,7 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
               </section>
               <section>
                 <SectionTitle>Suggested attempt order</SectionTitle>
-                <IdealOrderList rows={analysis.ideal} />
+                <IdealOrderList groups={analysis.ideal} />
               </section>
             </div>
           </div>

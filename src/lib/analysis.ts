@@ -191,6 +191,24 @@ export function idealOrder(paper: Paper, history: AttemptSummary[]): IdealRow[] 
     .sort((a, b) => b.marksPerMinute - a.marksPerMinute || a.topic.localeCompare(b.topic));
 }
 
+export interface IdealGroup {
+  /** Null when topics can be taken in any order across the paper. */
+  section: string | null;
+  rows: IdealRow[];
+}
+
+/**
+ * With section clocks you cannot move between sections, so a single ranking across them could not
+ * be followed. The ranking then restarts in each section, in paper order.
+ */
+export function idealOrderGroups(paper: Paper, history: AttemptSummary[], bySection: boolean): IdealGroup[] {
+  const rows = idealOrder(paper, history);
+  if (!bySection) return [{ section: null, rows }];
+  return paper.sections
+    .map((s) => ({ section: s.name, rows: rows.filter((r) => r.section === s.name) }))
+    .filter((g) => g.rows.length > 0);
+}
+
 function toIdealRow(
   topic: string,
   t: { section: string; questions: number; targetSec: number },

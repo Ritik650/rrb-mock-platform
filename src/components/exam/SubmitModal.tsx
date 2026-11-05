@@ -1,5 +1,5 @@
 import { countPalette } from '../../lib/examState';
-import type { Paper } from '../../lib/paper';
+import type { Paper, PaperSection } from '../../lib/paper';
 import type { QuestionProgress } from '../../types';
 import { Button, Modal } from '../common/ui';
 
@@ -7,6 +7,8 @@ interface Props {
   paper: Paper;
   progress: Record<string, QuestionProgress>;
   unsavedQuestionNo: number | null;
+  /** Set while a timed section is still to come: submitting then only ends the running section. */
+  moveOn: { section: PaperSection; next: PaperSection } | null;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -19,29 +21,25 @@ const COLUMNS = [
   ['not_visited', 'Not visited'],
 ] as const;
 
-export function SubmitModal({ paper, progress, unsavedQuestionNo, onCancel, onConfirm }: Props) {
-  const rows = paper.sections.map((s) => ({
-    name: s.name,
-    counts: countPalette(
-      s.items.map((i) => i.q.id),
+export function SubmitModal({ paper, progress, unsavedQuestionNo, moveOn, onCancel, onConfirm }: Props) {
+  const countsFor = (items: PaperSection['items']) =>
+    countPalette(
+      items.map((i) => i.q.id),
       progress,
-    ),
-  }));
-  const total = countPalette(
-    paper.items.map((i) => i.q.id),
-    progress,
-  );
+    );
+  const rows = (moveOn ? [moveOn.section] : paper.sections).map((s) => ({ name: s.name, counts: countsFor(s.items) }));
+  const total = countsFor(paper.items);
 
   return (
     <Modal
       wide
-      title="Submit this test?"
+      title={moveOn ? `Submit ${moveOn.section.name}?` : 'Submit this test?'}
       onClose={onCancel}
       footer={
         <>
-          <Button onClick={onCancel}>Back to the test</Button>
+          <Button onClick={onCancel}>{moveOn ? 'Back to this section' : 'Back to the test'}</Button>
           <Button variant="submit" onClick={onConfirm}>
-            Submit
+            {moveOn ? 'Submit section' : 'Submit'}
           </Button>
         </>
       }
@@ -72,18 +70,26 @@ export function SubmitModal({ paper, progress, unsavedQuestionNo, onCancel, onCo
               ))}
             </tr>
           ))}
-          <tr className="font-semibold">
-            <th scope="row" className="border border-line px-2 py-1 text-left font-semibold">
-              Total
-            </th>
-            {COLUMNS.map(([key]) => (
-              <td key={key} className="border border-line px-2 py-1 text-center">
-                {total[key]}
-              </td>
-            ))}
-          </tr>
+          {!moveOn && (
+            <tr className="font-semibold">
+              <th scope="row" className="border border-line px-2 py-1 text-left font-semibold">
+                Total
+              </th>
+              {COLUMNS.map(([key]) => (
+                <td key={key} className="border border-line px-2 py-1 text-center">
+                  {total[key]}
+                </td>
+              ))}
+            </tr>
+          )}
         </tbody>
       </table>
+      {moveOn && (
+        <p className="mt-2 text-sm font-medium">
+          You will move on to {moveOn.next.name} and cannot come back. Time left in this section is not added to the
+          next one.
+        </p>
+      )}
       <p className="mt-2 text-xs text-ink-2">
         Answered &amp; marked questions are evaluated. Marked questions with no answer are not.
       </p>

@@ -2,6 +2,7 @@ import { db } from './db';
 import { loadBank, type Bank } from './mockStore';
 import { closeVisit, type Clock, type ExamState } from '../lib/examState';
 import { paperFromBlocks, paperFromMock, type Paper } from '../lib/paper';
+import { sectionLimitsFor } from '../lib/sectionTiming';
 import { summarize } from '../lib/scoring';
 import type { Attempt, Block, Marking, QuestionProgress, ResponseRow, VisitRow } from '../types';
 
@@ -23,8 +24,11 @@ function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function newAttempt(fields: Pick<Attempt, 'kind' | 'mockNo' | 'blockIds' | 'title' | 'durationSec'>): Attempt {
+function newAttempt(
+  fields: Pick<Attempt, 'kind' | 'mockNo' | 'blockIds' | 'title' | 'durationSec' | 'sectionLimitsSec'>,
+): Attempt {
   const now = Date.now();
+  const firstClockMs = (fields.sectionLimitsSec?.[0] ?? fields.durationSec) * 1000;
   return {
     ...fields,
     id: newId(),
@@ -32,10 +36,11 @@ function newAttempt(fields: Pick<Attempt, 'kind' | 'mockNo' | 'blockIds' | 'titl
     startedAt: now,
     submittedAt: null,
     submitReason: null,
-    remainingMs: fields.durationSec * 1000,
+    activeSection: 0,
+    remainingMs: firstClockMs,
     checkpointAt: now,
     activeQid: null,
-    visitStartRemainingMs: fields.durationSec * 1000,
+    visitStartRemainingMs: firstClockMs,
     visitEnteredAt: now,
     nextVisitSeq: 0,
     summary: null,
@@ -51,6 +56,7 @@ export async function createMockAttempt(mockNo: number): Promise<string> {
     blockIds: null,
     title: mock.title,
     durationSec: mock.duration_min * 60,
+    sectionLimitsSec: sectionLimitsFor(mock),
   });
   await db.attempts.add(attempt);
   return attempt.id;
@@ -63,6 +69,7 @@ export async function createDrillAttempt(title: string, blocks: Block[], duratio
     blockIds: blocks.map((b) => b.id),
     title,
     durationSec,
+    sectionLimitsSec: null,
   });
   await db.attempts.add(attempt);
   return attempt.id;

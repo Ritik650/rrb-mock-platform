@@ -8,7 +8,7 @@ interface Props {
   cutOff: number;
 }
 
-function Row({ name, t, strong }: { name: string; t: Tally; strong?: boolean }) {
+function Row({ name, t, strong, limitSec }: { name: string; t: Tally; strong?: boolean; limitSec?: number }) {
   const cell = 'border border-line px-2 py-1 text-center';
   return (
     <tr className={strong ? 'font-semibold' : ''}>
@@ -22,7 +22,10 @@ function Row({ name, t, strong }: { name: string; t: Tally; strong?: boolean }) 
       <td className={cell}>{t.wrong}</td>
       <td className={cell}>{t.attempted ? `${t.accuracy.toFixed(1)}%` : '–'}</td>
       <td className={cell}>{formatScore(t.net)}</td>
-      <td className={cell}>{formatDuration(t.timeMs)}</td>
+      <td className={cell}>
+        {formatDuration(t.timeMs)}
+        {limitSec !== undefined && <span className="font-normal text-ink-2"> / {formatDuration(limitSec * 1000)}</span>}
+      </td>
     </tr>
   );
 }
@@ -61,7 +64,13 @@ export function ScoreHero({ attempt, overall, cutOff }: Omit<Props, 'sections'>)
   );
 }
 
-export function SectionTable({ overall, sections }: Pick<Props, 'overall' | 'sections'>) {
+interface SectionTableProps extends Pick<Props, 'overall' | 'sections'> {
+  /** Per-section limits when the paper was timed by section. */
+  limitsSec?: number[] | null;
+}
+
+export function SectionTable({ overall, sections, limitsSec }: SectionTableProps) {
+  const totalLimit = limitsSec?.reduce((a, b) => a + b, 0);
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse bg-white text-[13px] tabular-nums">
@@ -75,9 +84,9 @@ export function SectionTable({ overall, sections }: Pick<Props, 'overall' | 'sec
           </tr>
         </thead>
         <tbody>
-          <Row name="Overall" t={overall} strong />
-          {sections.map((s) => (
-            <Row key={s.name} name={s.name} t={s.tally} />
+          <Row name="Overall" t={overall} strong limitSec={totalLimit} />
+          {sections.map((s, i) => (
+            <Row key={s.name} name={s.name} t={s.tally} limitSec={limitsSec?.[i]} />
           ))}
         </tbody>
       </table>

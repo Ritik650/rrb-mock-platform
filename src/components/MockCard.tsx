@@ -1,5 +1,6 @@
 import type { MockStats } from '../data/attemptStore';
 import { formatClock, formatDate, formatScore } from '../lib/format';
+import { paperTimeLeftMs, sectionLimitsFor } from '../lib/sectionTiming';
 import type { Mock } from '../types';
 import { Button, LevelBadge } from './common/ui';
 
@@ -21,6 +22,7 @@ export function MockCard({ mock, stats, cutOff, onStart, onResume, onRestart, on
   const done = stats?.attempts ?? [];
   const best = stats?.best ?? null;
   const gap = best === null ? null : best - cutOff;
+  const limits = sectionLimitsFor(mock);
 
   return (
     <article
@@ -33,11 +35,11 @@ export function MockCard({ mock, stats, cutOff, onStart, onResume, onRestart, on
           <LevelBadge level={mock.level} />
         </div>
         <p className="mb-2 text-xs text-ink-2">
-          {questionCount(mock)} Q | {mock.duration_min} min
+          {questionCount(mock)} Q | {limits ? limits.map((sec) => sec / 60).join(' + ') : mock.duration_min} min
         </p>
         <div className="mb-2 border border-line bg-panel p-2 text-xs">
           {open ? (
-            <p className="font-semibold text-action">In progress: {formatClock(open.remainingMs)} left</p>
+            <p className="font-semibold text-action">In progress: {formatClock(paperTimeLeftMs(open))} left</p>
           ) : (
             <>
               <p className="flex justify-between">
