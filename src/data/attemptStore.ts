@@ -89,7 +89,13 @@ export function paperForAttempt(attempt: Attempt, bank: Bank): Paper {
     throw new Error('Some questions from this drill are no longer in your library.');
   }
   const marking = entries[0]?.mock.marking ?? DEFAULT_MARKING;
-  return paperFromBlocks(attempt.title, attempt.durationSec, marking, entries.map((e) => e.block));
+  return paperFromBlocks(
+    attempt.title,
+    attempt.durationSec,
+    marking,
+    entries.map((e) => e.block),
+    (block) => bank.blocks.get(block.id)?.targetScale ?? 1,
+  );
 }
 
 export async function loadAttempt(id: string): Promise<LoadedAttempt> {
@@ -185,6 +191,30 @@ export async function mockStats(): Promise<Map<number, MockStats>> {
 export async function submittedAttempts(): Promise<Attempt[]> {
   const rows = await db.attempts.where('status').equals('submitted').toArray();
   return rows.sort((a, b) => (a.submittedAt ?? 0) - (b.submittedAt ?? 0));
+}
+
+/**
+ * Finished attempts with each topic's target worked out from today's paper. A summary filed before
+ * targets were fitted to the section clocks still holds the old figure, and pooling the two would
+ * put the chart's target marks somewhere between them. Nothing stored is changed.
+ */
+export async function attemptsForProgress(): Promise<Attempt[]> {
+  const [attempts, bank] = await Promise.all([submittedAttempts(), loadBank()]);
+  return attempts.map((attempt) => withCurrentTargets(attempt, bank));
+}
+
+function withCurrentTargets(attempt: Attempt, bank: Bank): Attempt {
+  if (!attempt.summary) return attempt;
+  let paper: Paper;
+  try {
+    paper = paperForAttempt(attempt, bank);
+  } catch {
+    return attempt; // Its questions have left the library, so what was filed is all there is.
+  }
+  const targets = new Map<string, number>();
+  for (const { q, targetSec } of paper.items) targets.set(q.topic, (targets.get(q.topic) ?? 0) + targetSec);
+  const topics = attempt.summary.topics.map((t) => ({ ...t, targetSec: targets.get(t.topic) ?? t.targetSec }));
+  return { ...attempt, summary: { ...attempt.summary, topics } };
 }
 
 /** Every answer from every finished attempt, oldest attempt first, for ranking drill questions. */

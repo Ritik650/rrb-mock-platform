@@ -127,28 +127,21 @@ export function useExamSession(
     [persist, readClock],
   );
 
-  /** Hands over to the next section's own clock. Unused time on the old clock is not carried over. */
-  const moveToNextSection = useCallback(
-    (reason: 'manual' | 'timeout') => {
-      if (finished.current) return;
-      const prev = stateRef.current;
-      const stage = prev.activeStage + 1;
-      const now = Date.now();
-      const opening = { now, remainingMs: (attempt.sectionLimitsSec?.[stage] ?? 0) * 1000 };
-      const next = startNextStage(prev, { now, remainingMs: remainingAt(timer.current, now) }, opening);
-      timer.current = startTimer(createTimer(opening.remainingMs), now);
-      clock.set(opening.remainingMs);
-      stateRef.current = next;
-      setState(next);
-      setNotice(
-        reason === 'timeout'
-          ? `Time is up for ${paper.sections[prev.activeStage].name}. You are now in ${paper.sections[stage].name}.`
-          : null,
-      );
-      persist(prev, next, opening);
-    },
-    [attempt.sectionLimitsSec, clock, paper.sections, persist],
-  );
+  /** Hands over to the next section's own clock once the running section's time is up. */
+  const moveToNextSection = useCallback(() => {
+    if (finished.current) return;
+    const prev = stateRef.current;
+    const stage = prev.activeStage + 1;
+    const now = Date.now();
+    const opening = { now, remainingMs: (attempt.sectionLimitsSec?.[stage] ?? 0) * 1000 };
+    const next = startNextStage(prev, { now, remainingMs: remainingAt(timer.current, now) }, opening);
+    timer.current = startTimer(createTimer(opening.remainingMs), now);
+    clock.set(opening.remainingMs);
+    stateRef.current = next;
+    setState(next);
+    setNotice(`Time is up for ${paper.sections[prev.activeStage].name}. You are now in ${paper.sections[stage].name}.`);
+    persist(prev, next, opening);
+  }, [attempt.sectionLimitsSec, clock, paper.sections, persist]);
 
   const finish = useCallback(
     (reason: 'manual' | 'timeout') => {
@@ -188,7 +181,7 @@ export function useExamSession(
       if (crossedCritical(previousMs, at.remainingMs) && beepOn.current) softBeep();
       previousMs = at.remainingMs;
       if (at.remainingMs <= 0) {
-        if (hasNextStage(stateRef.current)) moveToNextSection('timeout');
+        if (hasNextStage(stateRef.current)) moveToNextSection();
         else finish('timeout');
       } else if (at.now - lastCheckpoint >= CHECKPOINT_MS) {
         checkpoint();
@@ -230,12 +223,10 @@ export function useExamSession(
       previous: () => apply(goPrevious),
       goToIndex: (index) => apply((s, at) => goTo(s, index, at)),
       togglePause,
-      submit: () => {
-        if (hasNextStage(stateRef.current)) moveToNextSection('manual');
-        else finish('manual');
-      },
+      // Only papers on one clock offer this. As in the real exam, a timed mock ends when its clocks do.
+      submit: () => finish('manual'),
     }),
-    [apply, finish, moveToNextSection, togglePause],
+    [apply, finish, togglePause],
   );
 
   return { state, clock, paused, notice, actions };

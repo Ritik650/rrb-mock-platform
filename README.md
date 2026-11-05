@@ -38,18 +38,28 @@ keep a copy.
 ## Exam behaviour worth knowing
 
 - **Each section has its own clock.** Reasoning Ability gets 25 minutes, then Quantitative Aptitude gets 20. At 0:00 the
-  test moves on by itself and you cannot go back. Submit section leaves early, and the time left is not added to the next
-  section. The timer colours and the beep apply to each section's clock. Imported papers with other sections or durations
-  run on one clock, and so do topic drills, where you can also switch sections freely.
+  test moves on by itself and you cannot go back. The last section's 0:00 submits the paper.
+- **A timed mock cannot be ended early,** matching IBPS's information handout for the exam. If you finish with time left,
+  you stay in that section until its clock ends, and time spent waiting counts against the question on screen. To stop a
+  mock, close the tab and resume it later, or use Start over on its card to discard it.
+- **Papers on one clock are different.** Topic drills, and imported papers with other sections or durations, run on a
+  single clock with free switching between sections and a Submit button. The timer colours and the beep apply to whichever
+  clock is running.
 - **Selections are drafts, as on the real console.** An answer counts only after Save & Next or Mark for Review & Next.
   Moving away any other way discards it. The screen warns you while a selection is unsaved. An unsaved selection also
   does not count when you submit or when time runs out.
+- **Clicking the chosen option again deselects it,** the same as Clear Response, and this also removes a saved answer.
 - **Keyboard:** 1-5 or A, B, D, E choose an option, **C is Clear Response**, N is Save & Next, M is Mark & Next, and ← and
-  → navigate. C cannot also choose option (c), so use 3 for that.
+  → navigate. C cannot also choose option (c), so use 3 for that. These shortcuts are for practice only: IBPS's handout says
+  pressing keyboard keys during the real exam locks it, so answer with the mouse there.
 - **The clock runs only while the test is open.** Closing the tab freezes it, and reopening resumes from the time left.
 
 ## How the analysis is worked out
 
+- **Targets** come from each question's `time` in the question file. Where a section's targets total more than its clock,
+  all of that section's targets are shortened by the same factor so they add up to the limit. Quant totals 28-30 minutes
+  in the bundled mocks, so its targets end up at about 69% and total exactly 20:00. The file itself is not changed. A
+  topic drill's clock is the sum of these shortened targets, so it runs at exam pace too.
 - **Average time** is all your time in a topic divided by the questions you answered there, so a long read you abandoned
   still counts against you. If you answered none, it divides by the questions you spent time on.
 - **Suggested attempt order** ranks topics within each section by expected marks per minute across all finished

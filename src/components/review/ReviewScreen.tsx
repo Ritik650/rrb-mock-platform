@@ -83,7 +83,7 @@ export function ReviewScreen({ loaded, initialBookmarks, initialQid }: Props) {
                 {q.topic}: {q.sub}
               </span>
             </h2>
-            <YourTime q={q} timeMs={progress.timeMs} selected={progress.selected} />
+            <YourTime q={q} targetSec={item.targetSec} timeMs={progress.timeMs} selected={progress.selected} />
           </div>
           {block.kind === 'set' && <SetPanel key={block.id} block={block} />}
           <div

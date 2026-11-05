@@ -1,3 +1,4 @@
+import { targetScaleFor } from './sectionTiming';
 import type { Block, Marking, Mock, Question } from '../types';
 
 /** A sitting's questions in order. A full mock and a topic drill both become one of these. */
@@ -8,6 +9,8 @@ export interface PaperItem {
   displayNo: number;
   section: string;
   index: number;
+  /** Seconds to aim for: q.time fitted to its section's clock. Analysis judges against this. */
+  targetSec: number;
 }
 
 export interface PaperSection {
@@ -30,12 +33,14 @@ function assemble(
   marking: Marking,
   groups: { name: string; blocks: Block[] }[],
   displayNo: (q: Question, position: number) => number,
+  targetScale: (block: Block, section: string) => number,
 ): Paper {
   const items: PaperItem[] = [];
   const sections: PaperSection[] = [];
   for (const group of groups) {
     const section: PaperSection = { name: group.name, items: [] };
     for (const block of group.blocks) {
+      const scale = targetScale(block, group.name);
       for (const q of block.qs) {
         const index = items.length;
         const item: PaperItem = {
@@ -44,6 +49,7 @@ function assemble(
           displayNo: displayNo(q, index + 1),
           section: group.name,
           index,
+          targetSec: q.time * scale,
         };
         items.push(item);
         section.items.push(item);
@@ -62,11 +68,28 @@ function assemble(
 }
 
 export function paperFromMock(mock: Mock): Paper {
-  return assemble(mock.title, mock.duration_min * 60, mock.marking, mock.sections, (q) => q.no);
+  const scale = targetScaleFor(mock);
+  return assemble(
+    mock.title,
+    mock.duration_min * 60,
+    mock.marking,
+    mock.sections,
+    (q) => q.no,
+    (_block, section) => scale(section),
+  );
 }
 
-/** Groups a drill's blocks by section in first-seen order and numbers them from 1. */
-export function paperFromBlocks(title: string, durationSec: number, marking: Marking, blocks: Block[]): Paper {
+/**
+ * Groups a drill's blocks by section in first-seen order and numbers them from 1. `targetScale`
+ * gives each block the scale it has in its own mock, so a question's target is the same everywhere.
+ */
+export function paperFromBlocks(
+  title: string,
+  durationSec: number,
+  marking: Marking,
+  blocks: Block[],
+  targetScale: (block: Block) => number = () => 1,
+): Paper {
   const groups: { name: string; blocks: Block[] }[] = [];
   for (const block of blocks) {
     const name = block.qs[0].section;
@@ -77,5 +100,5 @@ export function paperFromBlocks(title: string, durationSec: number, marking: Mar
     }
     group.blocks.push(block);
   }
-  return assemble(title, durationSec, marking, groups, (_q, position) => position);
+  return assemble(title, durationSec, marking, groups, (_q, position) => position, targetScale);
 }

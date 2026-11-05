@@ -42,7 +42,7 @@ export function tallyQuestions(
 
 function topicStats(paper: Paper, progress: Record<string, QuestionProgress | undefined>): TopicStat[] {
   const byTopic = new Map<string, TopicStat>();
-  for (const { q, section } of paper.items) {
+  for (const { q, section, targetSec } of paper.items) {
     let stat = byTopic.get(q.topic);
     if (!stat) {
       stat = { topic: q.topic, section, total: 0, attempted: 0, correct: 0, timeMs: 0, targetSec: 0 };
@@ -51,7 +51,7 @@ function topicStats(paper: Paper, progress: Record<string, QuestionProgress | un
     const p = progress[q.id];
     const outcome = outcomeOf(q, p?.selected);
     stat.total += 1;
-    stat.targetSec += q.time;
+    stat.targetSec += targetSec;
     stat.timeMs += p?.timeMs ?? 0;
     if (outcome !== 'blank') stat.attempted += 1;
     if (outcome === 'correct') stat.correct += 1;

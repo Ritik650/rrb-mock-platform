@@ -31,9 +31,8 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
   const firstInRange = state.ranges[state.activeStage].start;
   const nextSection = hasNextStage(state) ? paper.sections[state.activeStage + 1] : null;
 
-  // A section's time can run out while its dialog is open. The dialog no longer applies then.
+  // A section's time can run out while the palette drawer is open on a small screen.
   useEffect(() => {
-    setConfirming(false);
     setDrawerOpen(false);
   }, [state.activeStage]);
 
@@ -96,6 +95,7 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
               unsaved={unsaved}
               marking={paper.marking}
               onSelect={actions.select}
+              onClear={actions.clear}
             />
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line bg-white px-3 py-2">
               <div className="flex flex-wrap gap-2">
@@ -137,9 +137,15 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
           >
             <Palette section={section} activeQid={item.q.id} progress={state.progress} onPick={pick} />
             <div className="shrink-0 border-t border-line p-2">
-              <Button variant="submit" className="w-full" onClick={() => setConfirming(true)}>
-                {nextSection ? 'Submit section' : 'Submit'}
-              </Button>
+              {sectional ? (
+                <p className="flex min-h-9 items-center justify-center text-center text-[13px] text-ink-2">
+                  {nextSection ? `${nextSection.name} opens when time runs out.` : 'The test ends when time runs out.'}
+                </p>
+              ) : (
+                <Button variant="submit" className="w-full" onClick={() => setConfirming(true)}>
+                  Submit
+                </Button>
+              )}
             </div>
           </aside>
         </div>
@@ -150,7 +156,6 @@ export function ExamScreen({ loaded, settings, onFinished }: Props) {
           paper={paper}
           progress={state.progress}
           unsavedQuestionNo={unsaved ? item.displayNo : null}
-          moveOn={nextSection ? { section, next: nextSection } : null}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);

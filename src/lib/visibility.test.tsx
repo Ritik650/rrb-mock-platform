@@ -17,6 +17,7 @@ const renderTestPane = (item: (typeof papers)[number]['items'][number]) =>
       unsaved={false}
       marking={{ correct: 1, wrong: -0.25 }}
       onSelect={() => undefined}
+      onClear={() => undefined}
     />,
   );
 

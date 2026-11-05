@@ -99,6 +99,15 @@ describe('planDrill', () => {
     expect(plan.durationSec).toBe(65);
   });
 
+  it('uses each block\'s own shortened targets, rounded up to a whole second', () => {
+    const blocks = [single(1, 'X', 40), single(2, 'X', 25)];
+    const half = (b: Block) => (b.id === 'S1' ? 0.5 : 1);
+    const plan = planDrill(blocks, new Set(['X']), 2, new Map(), fixedRandom, half);
+    expect(plan.durationSec).toBe(45);
+    const third = planDrill(blocks, new Set(['X']), 2, new Map(), fixedRandom, () => 1 / 3);
+    expect(third.durationSec).toBe(22);
+  });
+
   it('returns everything available when asked for more than exists', () => {
     const plan = planDrill([single(1), single(2)], new Set(['Syllogism']), 50, new Map(), fixedRandom);
     expect(plan.questionCount).toBe(2);

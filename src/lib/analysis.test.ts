@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { attemptOrder, idealOrder, idealOrderGroups, timeSinks, topicTable } from './analysis';
-import { paperFromBlocks } from './paper';
+import { paperFromBlocks, paperFromMock } from './paper';
 import { summarize } from './scoring';
-import { makeQuestion } from '../test/bundle';
+import { loadRealBundle, makeQuestion } from '../test/bundle';
 import type { Block, QuestionProgress, Question } from '../types';
 
 const block = (id: string, qs: Question[]): Block => ({
@@ -199,5 +199,47 @@ describe('ideal order with section clocks', () => {
     expect(groups[0].section).toBeNull();
     expect(groups[0].rows.map((r) => r.topic)).toEqual(['Series', 'Syllogism', 'Puzzle']);
     expect(groups[0].rows).toEqual(idealOrder(paper, history));
+  });
+});
+
+describe('targets fitted to the section clock', () => {
+  const paper = paperFromMock(loadRealBundle().mocks[0]);
+  const quant = paper.sections[1].items[0];
+  const reasoning = paper.sections[0].items[0];
+  const rowFor = (topic: string, progress: Record<string, QuestionProgress>) =>
+    topicTable(paper, progress).find((r) => r.key === topic)!;
+
+  it('shows the fitted target in the topic table', () => {
+    const row = rowFor(quant.q.topic, { [quant.q.id]: done(quant.q.ans, 1000) });
+    expect(row.targetMs).toBeCloseTo(quant.targetSec * 1000, 6);
+    expect(row.targetMs).toBeLessThan(quant.q.time * 1000);
+  });
+
+  it('calls the question file\'s pace slow in Quant, where it would not finish, but not in Reasoning', () => {
+    const atFilePace = (i: typeof quant) => ({ [i.q.id]: done(i.q.ans, i.q.time * 1000) });
+    expect(rowFor(quant.q.topic, atFilePace(quant)).slow).toBe(true);
+    expect(rowFor(reasoning.q.topic, atFilePace(reasoning)).slow).toBe(false);
+  });
+
+  it('measures time sinks from the fitted target', () => {
+    const sinks = timeSinks(paper, {
+      [quant.q.id]: done(null, quant.q.time * 1600),
+      [reasoning.q.id]: done(null, reasoning.q.time * 1600),
+    });
+    expect(sinks.map((s) => s.item.q.id)).toEqual([quant.q.id]);
+    expect(sinks[0].targetMs).toBeCloseTo(quant.targetSec * 1000, 6);
+    expect(sinks[0].lostMs).toBeCloseTo((quant.q.time * 1.6 - quant.targetSec) * 1000, 6);
+  });
+
+  it('places a topic with no history at its fitted target', () => {
+    const inTopic = paper.items.filter((i) => i.q.topic === quant.q.topic);
+    const row = idealOrder(paper, []).find((r) => r.topic === quant.q.topic)!;
+    const mean = inTopic.reduce((sum, i) => sum + i.targetSec, 0) / inTopic.length;
+    expect(row.secPerQuestion).toBeCloseTo(mean, 6);
+  });
+
+  it('files fitted targets in the summary', () => {
+    const topics = summarize(paper, {}).topics.filter((t) => t.section === 'Quantitative Aptitude');
+    expect(topics.reduce((sum, t) => sum + t.targetSec, 0)).toBeCloseTo(1200, 6);
   });
 });

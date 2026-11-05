@@ -76,6 +76,16 @@ describe('review screen', () => {
     expect(time).toContain(`0:${q1.time}`);
   });
 
+  it('shows a Quant question against its target fitted to the 20 minute clock', () => {
+    const item = paper.sections[1].items[0];
+    setup({ [item.q.id]: answer(item.q.ans, 1000) }, item.q.id);
+    const seconds = Math.round(item.targetSec);
+    expect(seconds).toBeLessThan(item.q.time);
+    expect(screen.getByTestId('review-time').textContent).toContain(
+      `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
+    );
+  });
+
   it('reveals the puzzle arrangement in the solution', () => {
     setup({}, puzzleQuestion.q.id);
     const visual = within(screen.getByTestId('solution-visual')).getByRole('img');

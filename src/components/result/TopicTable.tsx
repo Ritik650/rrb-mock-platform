@@ -99,8 +99,9 @@ export function TopicTable({ rows }: { rows: TopicRow[] }) {
         </tbody>
       </table>
       <p className="mt-1 text-xs text-ink-2">
-        Flagged when accuracy is below {ACCURACY_FLOOR}% or average time is over {SLOW_FACTOR} × target. Average time
-        is all your time in the topic per question answered, so a long read you abandoned still counts.
+        Flagged when accuracy is below {ACCURACY_FLOOR}% or average time is over {SLOW_FACTOR} × target. Targets come
+        from your question file, shortened where a section's total runs past its clock. Average time is all your time
+        in the topic per question answered, so a long read you abandoned still counts.
       </p>
     </div>
   );

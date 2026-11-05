@@ -21,6 +21,22 @@ export function sectionLimitsFor(mock: Pick<Mock, 'sections' | 'duration_min'>):
 }
 
 /**
+ * How far to shorten a section's target times so they add up to its clock. The bank's Quant targets
+ * total 28-30 minutes against a 20 minute limit, so that pace could not finish the section. Targets
+ * that already fit stay as written, and a mock with no section clocks has no limit to fit.
+ */
+export function targetScaleFor(mock: Pick<Mock, 'sections' | 'duration_min'>): (section: string) => number {
+  const limits = sectionLimitsFor(mock);
+  const scales = new Map(
+    mock.sections.map((s, i) => {
+      const total = s.blocks.flatMap((b) => b.qs).reduce((sum, q) => sum + q.time, 0);
+      return [s.name, limits && total > limits[i] ? limits[i] / total : 1];
+    }),
+  );
+  return (section) => scales.get(section) ?? 1;
+}
+
+/**
  * The stretch of questions each clock covers. Without section limits that is the whole paper, which
  * is how drills run, along with any mock begun before sections were timed.
  */

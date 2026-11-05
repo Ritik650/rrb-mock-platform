@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { paperFromBlocks, paperFromMock } from './paper';
-import { clockRanges, paperTimeLeftMs, sectionLimitsFor } from './sectionTiming';
+import { paperFromBlocks, paperFromMock, type Paper } from './paper';
+import { clockRanges, paperTimeLeftMs, sectionLimitsFor, targetScaleFor } from './sectionTiming';
 import { loadRealBundle, makeQuestion } from '../test/bundle';
 import type { Mock } from '../types';
 
@@ -28,6 +28,66 @@ describe('sectionLimitsFor', () => {
   it('falls back to one clock when the limits do not add up to the paper\'s duration', () => {
     expect(sectionLimitsFor(shape(['Reasoning Ability', 'Quantitative Aptitude'], 60))).toBeNull();
     expect(sectionLimitsFor(shape(['Reasoning Ability'], 45))).toBeNull();
+  });
+});
+
+describe('fitting targets to the section clocks', () => {
+  const targetTotal = (paper: Paper, name: string) =>
+    paper.sections.find((s) => s.name === name)!.items.reduce((sum, i) => sum + i.targetSec, 0);
+  const fileTotal = (paper: Paper, name: string) =>
+    paper.sections.find((s) => s.name === name)!.items.reduce((sum, i) => sum + i.q.time, 0);
+  const oneQuestionSection = (name: string, time: number) => ({
+    name,
+    blocks: [{ id: `B-${name}`, kind: 'single' as const, topic: 't', sub: 's', qs: [makeQuestion(1, { section: name, time })] }],
+  });
+
+  it('makes every mock\'s Quant targets total its 20 minute clock', () => {
+    for (const mock of bundle.mocks) {
+      const paper = paperFromMock(mock);
+      expect(fileTotal(paper, 'Quantitative Aptitude'), mock.title).toBeGreaterThan(1200);
+      expect(targetTotal(paper, 'Quantitative Aptitude'), mock.title).toBeCloseTo(1200, 6);
+    }
+  });
+
+  it('leaves Reasoning as written wherever it already fits', () => {
+    for (const mock of bundle.mocks) {
+      const paper = paperFromMock(mock);
+      const total = fileTotal(paper, 'Reasoning Ability');
+      if (total <= 1500) expect(targetTotal(paper, 'Reasoning Ability'), mock.title).toBe(total);
+      else expect(targetTotal(paper, 'Reasoning Ability'), mock.title).toBeCloseTo(1500, 6);
+    }
+  });
+
+  it('keeps the proportions between questions and leaves the question file alone', () => {
+    const paper = paperFromMock(bundle.mocks[0]);
+    const items = paper.sections[1].items;
+    const scale = items[0].targetSec / items[0].q.time;
+    expect(scale).toBeCloseTo(1200 / fileTotal(paper, 'Quantitative Aptitude'), 9);
+    for (const item of items) expect(item.targetSec).toBeCloseTo(item.q.time * scale, 9);
+    expect(items[0].q.time).toBe(bundle.mocks[0].sections[1].blocks[0].qs[0].time);
+  });
+
+  it('never stretches a section that comes in under its clock', () => {
+    const scale = targetScaleFor({
+      duration_min: 45,
+      sections: [oneQuestionSection('Reasoning Ability', 60), oneQuestionSection('Quantitative Aptitude', 60)],
+    });
+    expect(scale('Reasoning Ability')).toBe(1);
+    expect(scale('Quantitative Aptitude')).toBe(1);
+  });
+
+  it('shortens an imported paper on the same rule', () => {
+    const scale = targetScaleFor({
+      duration_min: 45,
+      sections: [oneQuestionSection('Reasoning Ability', 3000), oneQuestionSection('Quantitative Aptitude', 60)],
+    });
+    expect(scale('Reasoning Ability')).toBe(0.5);
+    expect(scale('Quantitative Aptitude')).toBe(1);
+  });
+
+  it('has no limit to fit on a paper with no section clocks', () => {
+    const scale = targetScaleFor({ duration_min: 30, sections: [oneQuestionSection('English', 9000)] });
+    expect(scale('English')).toBe(1);
   });
 });
 

@@ -77,14 +77,21 @@ export function SolutionBlock({ q, block }: { q: Question; block: Block }) {
   );
 }
 
-export function YourTime({ q, timeMs, selected }: { q: Question; timeMs: number; selected: number | null }) {
+interface YourTimeProps {
+  q: Question;
+  targetSec: number;
+  timeMs: number;
+  selected: number | null;
+}
+
+export function YourTime({ q, targetSec, timeMs, selected }: YourTimeProps) {
   const outcome = outcomeOf(q, selected);
-  const over = timeMs > q.time * 1000;
+  const over = timeMs > targetSec * 1000;
   return (
     <span className="flex items-center gap-3 text-xs text-ink-2 tabular-nums">
       <span data-testid="review-time">
         Your time <strong className={over ? 'text-amber' : 'text-ink'}>{formatDuration(timeMs)}</strong> · Target{' '}
-        <strong className="text-ink">{formatDuration(q.time * 1000)}</strong>
+        <strong className="text-ink">{formatDuration(targetSec * 1000)}</strong>
       </span>
       <span
         className={`border px-1 text-[10px] font-semibold ${

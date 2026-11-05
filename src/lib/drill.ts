@@ -38,7 +38,7 @@ export function questionStandings(
 export interface DrillPlan {
   blocks: Block[];
   questionCount: number;
-  /** The sum of the target times. */
+  /** The sum of the target times, rounded up to a whole second. */
   durationSec: number;
 }
 
@@ -72,6 +72,7 @@ export function planDrill(
   count: number,
   standings: Map<string, QuestionStanding>,
   random: () => number = Math.random,
+  targetScale: (block: Block) => number = () => 1,
 ): DrillPlan {
   const standingOf = (q: Question): QuestionStanding => standings.get(q.id) ?? 'never_seen';
   const rank = (block: Block) => Math.min(...block.qs.map((q) => PRIORITY.indexOf(standingOf(q))));
@@ -94,11 +95,11 @@ export function planDrill(
     remaining -= block.qs.length;
   }
 
-  const questions = picked.flatMap((b) => b.qs);
+  const targets = picked.flatMap((b) => b.qs.map((q) => q.time * targetScale(b)));
   return {
     blocks: picked,
-    questionCount: questions.length,
-    durationSec: questions.reduce((sum, q) => sum + q.time, 0),
+    questionCount: targets.length,
+    durationSec: Math.ceil(targets.reduce((sum, t) => sum + t, 0)),
   };
 }
 

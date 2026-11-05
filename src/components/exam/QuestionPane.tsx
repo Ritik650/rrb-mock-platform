@@ -10,9 +10,10 @@ interface Props {
   unsaved: boolean;
   marking: Marking;
   onSelect: (option: number) => void;
+  onClear: () => void;
 }
 
-function QuestionPaneBase({ item, draft, unsaved, marking, onSelect }: Props) {
+function QuestionPaneBase({ item, draft, unsaved, marking, onSelect, onClear }: Props) {
   const { q, block } = item;
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
@@ -42,6 +43,10 @@ function QuestionPaneBase({ item, draft, unsaved, marking, onSelect }: Props) {
                   name={`option-${q.id}`}
                   checked={selected}
                   onChange={() => onSelect(i)}
+                  // A radio sends no change event when clicked again, so deselecting listens for the click.
+                  onClick={() => {
+                    if (selected) onClear();
+                  }}
                   className="h-3.5 w-3.5 accent-action"
                 />
                 <span className="text-[13px] font-medium">({optionLetter(i)})</span>

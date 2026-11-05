@@ -8,6 +8,7 @@ import { drillTitle, planDrill, questionStandings } from '../lib/drill';
 import { formatClock, formatDate, formatDuration, formatScore } from '../lib/format';
 import { useAsync } from '../lib/useAsync';
 import { navigate } from '../router';
+import type { Block } from '../types';
 
 interface TopicInfo {
   topic: string;
@@ -31,6 +32,7 @@ async function loadDrillData() {
   }
   return {
     blocks: [...bank.blocks.values()].map((b) => b.block),
+    targetScale: (block: Block) => bank.blocks.get(block.id)?.targetScale ?? 1,
     standings,
     topics: [...byTopic.values()],
     open: attempts.filter((a) => a.status === 'in_progress'),
@@ -62,7 +64,7 @@ export function DrillPage() {
 
   async function start() {
     if (!data) return;
-    const plan = planDrill(data.blocks, chosen, requested, data.standings);
+    const plan = planDrill(data.blocks, chosen, requested, data.standings, Math.random, data.targetScale);
     if (plan.questionCount === 0) {
       setNotice('No questions match those topics.');
       return;
@@ -141,7 +143,7 @@ export function DrillPage() {
               </Button>
               <p className="text-xs text-ink-2">
                 Questions you got wrong or never saw come first. Sets stay whole, so a drill can run a little over.
-                The clock is the sum of the target times.
+                The clock is the sum of the target times, so Quant runs at exam pace.
               </p>
             </div>
             {notice && (

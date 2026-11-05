@@ -62,11 +62,6 @@ const tab = (name: RegExp) => screen.getByRole('tab', { name }) as HTMLButtonEle
 const REASONING = /Reasoning Ability/;
 const QUANT = /Quantitative Aptitude/;
 
-function submitSectionEarly() {
-  fireEvent.click(screen.getByRole('button', { name: 'Submit section' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submit section' }));
-}
-
 /** IndexedDB's own scheduling stays real. Only the app's clock and tick are faked. */
 const fakeClock = () => vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
 
@@ -203,10 +198,81 @@ describe('exam screen', () => {
   });
 
   it('warns on the summary when the current selection is unsaved', async () => {
-    await mount();
+    await mount({}, await singleClockAttempt());
     fireEvent.click(screen.getAllByRole('radio')[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Submit section' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
     expect(screen.getByRole('alert').textContent).toMatch(/question 1 is not saved/);
+  });
+});
+
+describe('clicking the chosen option again', () => {
+  const radio = (i: number) => screen.getAllByRole('radio')[i] as HTMLInputElement;
+
+  it('deselects it, leaving nothing to save', async () => {
+    await mount();
+    fireEvent.click(radio(1));
+    expect(radio(1).checked).toBe(true);
+    expect(screen.getByRole('status').textContent).toMatch(/Not saved yet/);
+
+    fireEvent.click(radio(1));
+    expect(radio(1).checked).toBe(false);
+    expect(screen.queryByRole('status')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Save & Next/ }));
+    expect(paletteButton(1).dataset.state).toBe('not_answered');
+  });
+
+  it('works by clicking the option\'s row as well as its button', async () => {
+    await mount();
+    const row = radio(2).closest('label')!;
+    fireEvent.click(row);
+    expect(radio(2).checked).toBe(true);
+    fireEvent.click(row);
+    expect(radio(2).checked).toBe(false);
+  });
+
+  it('removes a saved answer, the same as Clear Response', async () => {
+    const { id } = await mount();
+    fireEvent.click(radio(1));
+    fireEvent.click(screen.getByRole('button', { name: /^Save & Next/ }));
+    fireEvent.click(paletteButton(1));
+    expect(radio(1).checked).toBe(true);
+
+    fireEvent.click(radio(1));
+    expect(radio(1).checked).toBe(false);
+    expect(paletteButton(1).dataset.state).toBe('not_answered');
+    await until(async () => (await saved(id, 'M01-Q01'))?.selected === null);
+  });
+
+  it('leaves switching to a different option alone', async () => {
+    await mount();
+    fireEvent.click(radio(1));
+    fireEvent.click(radio(3));
+    expect(radio(1).checked).toBe(false);
+    expect(radio(3).checked).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^Save & Next/ }));
+    expect(paletteButton(1).dataset.state).toBe('answered');
+  });
+
+  it('keeps a saved answer when a different option is clicked but never saved', async () => {
+    const { id } = await mount();
+    fireEvent.click(radio(1));
+    fireEvent.click(screen.getByRole('button', { name: /^Save & Next/ }));
+    fireEvent.click(paletteButton(1));
+
+    fireEvent.click(radio(3));
+    fireEvent.click(paletteButton(2));
+    expect(paletteButton(1).dataset.state).toBe('answered');
+    fireEvent.click(paletteButton(1));
+    expect(radio(1).checked).toBe(true);
+    await until(async () => (await saved(id, 'M01-Q01'))?.selected === 1);
+  });
+
+  it('does not apply to the number keys, so a repeated press cannot lose an answer', async () => {
+    await mount();
+    fireEvent.keyDown(window, { key: '2' });
+    fireEvent.keyDown(window, { key: '2' });
+    expect(radio(1).checked).toBe(true);
   });
 });
 
@@ -287,58 +353,27 @@ describe('section clocks', () => {
     expect((await saved(id, 'M01-Q01'))?.selected).toBeNull();
   });
 
-  it('closes the submit dialog if the section ends while it is open', async () => {
-    fakeClock();
-    await mount({}, await withFirstClockAt(2000));
-    fireEvent.click(screen.getByRole('button', { name: 'Submit section' }));
-    expect(screen.getByRole('dialog', { name: /Submit Reasoning Ability/ })).toBeTruthy();
-    act(() => void vi.advanceTimersByTime(2000));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Question No. 41' })).toBeTruthy();
-  });
-
-  it('leaves a section early only on confirmation, without carrying time over', async () => {
+  it('offers no way out of a section before its time ends', async () => {
     fakeClock();
     await mount();
     act(() => void vi.advanceTimersByTime(MIN));
-    fireEvent.click(screen.getByRole('button', { name: 'Submit section' }));
-    const dialog = screen.getByRole('dialog', { name: /Submit Reasoning Ability/ });
-    expect(dialog.textContent).toMatch(/cannot come back/);
-    expect(dialog.textContent).toMatch(/not added to the next/);
-    expect(within(dialog).getAllByRole('row')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /Submit/ })).toBeNull();
+    expect(screen.getByText('Quantitative Aptitude opens when time runs out.')).toBeTruthy();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to this section' }));
+    for (const key of ['s', 'Enter', 'Escape']) fireEvent.keyDown(window, { key });
     expect(screen.getByRole('heading', { name: 'Question No. 1' })).toBeTruthy();
-
-    submitSectionEarly();
-    expect(screen.getByRole('heading', { name: 'Question No. 41' })).toBeTruthy();
-    expect(screen.getByRole('timer').textContent).toContain('20:00');
-    expect(screen.queryByRole('status')).toBeNull(); // no "time is up" when you chose to leave
+    expect(screen.getByRole('timer').textContent).toContain('24:00');
   });
 
-  it('summarises both sections before the final submission, and only submits on confirm', async () => {
-    const { onFinished, id } = await mount();
-    fireEvent.click(screen.getAllByRole('radio')[0]);
-    fireEvent.click(screen.getByRole('button', { name: /^Save & Next/ }));
-    submitSectionEarly();
+  it('offers no Submit in the last section either', async () => {
+    fakeClock();
+    const { onFinished } = await mount({}, await withFirstClockAt(1000));
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(screen.getByRole('heading', { name: 'Question No. 41' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Submit/ })).toBeNull();
+    expect(screen.getByText('The test ends when time runs out.')).toBeTruthy();
+    expect(screen.queryByText(/opens when time runs out/)).toBeNull();
     expect(onFinished).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    const dialog = screen.getByRole('dialog', { name: 'Submit this test?' });
-    expect(dialog.textContent).toContain('Reasoning Ability');
-    expect(dialog.textContent).toContain('Quantitative Aptitude');
-    expect(dialog.textContent).toContain('Total');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to the test' }));
-    expect(onFinished).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submit' }));
-    await waitFor(() => expect(onFinished).toHaveBeenCalledWith(id));
-    const attempt = await db.attempts.get(id);
-    expect(attempt?.status).toBe('submitted');
-    expect(attempt?.submitReason).toBe('manual');
-    expect(attempt?.summary?.overall.attempted).toBe(1);
-    expect(await db.responses.where('attemptId').equals(id).count()).toBe(80);
   });
 
   it('auto-submits when the last section\'s clock reaches 0:00', async () => {
@@ -357,13 +392,12 @@ describe('section clocks', () => {
   it('times questions across the handover, with no time lost or doubled', async () => {
     fakeClock();
     const id = await withFirstClockAt(10_000);
+    await db.attempts.update(id, { sectionLimitsSec: [1500, 7] });
     const { onFinished } = await mount({}, id);
     act(() => void vi.advanceTimersByTime(4000));
     fireEvent.click(paletteButton(2));
     act(() => void vi.advanceTimersByTime(6000)); // section ends on Q2
-    act(() => void vi.advanceTimersByTime(7000)); // Q41
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submit' }));
+    act(() => void vi.advanceTimersByTime(7000)); // the paper ends on Q41
     await vi.waitFor(() => expect(onFinished).toHaveBeenCalled());
 
     expect((await saved(id, 'M01-Q01'))?.timeMs).toBe(4000);
@@ -428,13 +462,27 @@ describe('a paper on one clock', () => {
     expect(screen.getByRole('heading', { name: 'Question No. 41' })).toBeTruthy();
   });
 
-  it('submits straight away, with both sections on the summary', async () => {
+  it('can be submitted early, with both sections on the summary, and only on confirm', async () => {
     const { onFinished, id } = await mount({}, await singleClockAttempt());
+    fireEvent.click(screen.getAllByRole('radio')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /^Save & Next/ }));
+
     fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
     const dialog = screen.getByRole('dialog', { name: 'Submit this test?' });
+    expect(dialog.textContent).toContain('Reasoning Ability');
     expect(dialog.textContent).toContain('Quantitative Aptitude');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Submit' }));
+    expect(dialog.textContent).toContain('Total');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Back to the test' }));
+    expect(onFinished).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submit' }));
     await waitFor(() => expect(onFinished).toHaveBeenCalledWith(id));
+    const attempt = await db.attempts.get(id);
+    expect(attempt?.status).toBe('submitted');
+    expect(attempt?.submitReason).toBe('manual');
+    expect(attempt?.summary?.overall.attempted).toBe(1);
+    expect(await db.responses.where('attemptId').equals(id).count()).toBe(80);
   });
 
   it('turns orange at 5:00, red at 1:00 and beeps once, then auto-submits at 0:00', async () => {
@@ -525,10 +573,10 @@ describe('resume after reload', () => {
 
   it('comes back to the second section, still locked, with the first section\'s answers kept', async () => {
     fakeClock();
-    const { id, unmount } = await mount();
+    const { id, unmount } = await mount({}, await withFirstClockAt(1000));
     fireEvent.keyDown(window, { key: '2' });
     fireEvent.keyDown(window, { key: 'n' });
-    submitSectionEarly();
+    act(() => void vi.advanceTimersByTime(1000));
     act(() => void vi.advanceTimersByTime(3 * MIN));
     fireEvent.keyDown(window, { key: '4' });
     fireEvent.keyDown(window, { key: 'n' });
@@ -545,9 +593,8 @@ describe('resume after reload', () => {
     expect(tab(REASONING).disabled).toBe(true);
     expect(tab(QUANT).getAttribute('aria-selected')).toBe('true');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submit' }));
-    await vi.waitFor(() => expect(onFinished).toHaveBeenCalled());
+    act(() => void vi.advanceTimersByTime(17 * MIN));
+    await until(async () => onFinished.mock.calls.length > 0);
     expect((await db.attempts.get(id))?.summary?.overall.attempted).toBe(2);
   });
 
@@ -587,19 +634,19 @@ describe('resume after reload', () => {
 
   it('logs time across revisits and across the reload', async () => {
     fakeClock();
-    const { id, unmount } = await mount();
+    const id = await withFirstClockAt(35_000);
+    await db.attempts.update(id, { sectionLimitsSec: [1500, 1] });
+    const { unmount } = await mount({}, id);
     act(() => void vi.advanceTimersByTime(20_000));
     fireEvent.click(paletteButton(2));
     act(() => void vi.advanceTimersByTime(5_000));
     fireEvent.click(paletteButton(1));
     act(() => void vi.advanceTimersByTime(7_000));
     unmount();
-    await until(remainingIs(id, 25 * MIN - 32_000));
+    await until(remainingIs(id, 3_000));
     const { onFinished } = await mount({}, id);
-    act(() => void vi.advanceTimersByTime(3_000));
-    submitSectionEarly();
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Submit' }));
+    act(() => void vi.advanceTimersByTime(3_000)); // the section's clock ends on Q1
+    act(() => void vi.advanceTimersByTime(1_000)); // the paper ends on Q41
     await vi.waitFor(() => expect(onFinished).toHaveBeenCalled());
 
     expect((await saved(id, 'M01-Q01'))?.timeMs).toBe(30_000);
@@ -610,7 +657,7 @@ describe('resume after reload', () => {
       ['M01-Q02', 5_000],
       ['M01-Q01', 7_000],
       ['M01-Q01', 3_000],
-      ['M01-Q41', 0],
+      ['M01-Q41', 1_000],
     ]);
     for (const v of visits) expect(v.leftAt).toBeGreaterThanOrEqual(v.enteredAt);
   });

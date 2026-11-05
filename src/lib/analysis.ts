@@ -36,18 +36,18 @@ function groupRow(key: string, label: string, items: PaperItem[], progress: Prog
   let attemptedTarget = 0;
   let visited = 0;
   let visitedTarget = 0;
-  for (const { q } of items) {
+  for (const { q, targetSec } of items) {
     const p = progress[q.id];
     const outcome = outcomeOf(q, p?.selected);
     timeMs += p?.timeMs ?? 0;
     if (outcome !== 'blank') {
       attempted += 1;
-      attemptedTarget += q.time;
+      attemptedTarget += targetSec;
     }
     if (outcome === 'correct') correct += 1;
     if ((p?.timeMs ?? 0) > 0) {
       visited += 1;
-      visitedTarget += q.time;
+      visitedTarget += targetSec;
     }
   }
   // With nothing attempted, fall back to the questions you spent time on.
@@ -106,7 +106,7 @@ export function timeSinks(paper: Paper, progress: ProgressMap): TimeSink[] {
   for (const item of paper.items) {
     const p = progress[item.q.id];
     const timeMs = p?.timeMs ?? 0;
-    const targetMs = item.q.time * 1000;
+    const targetMs = item.targetSec * 1000;
     if (timeMs > SINK_FACTOR * targetMs) {
       sinks.push({ item, timeMs, targetMs, lostMs: timeMs - targetMs, outcome: outcomeOf(item.q, p?.selected) });
     }
@@ -170,10 +170,10 @@ export interface IdealRow {
  */
 export function idealOrder(paper: Paper, history: AttemptSummary[]): IdealRow[] {
   const inPaper = new Map<string, { section: string; questions: number; targetSec: number }>();
-  for (const { q, section } of paper.items) {
+  for (const { q, section, targetSec } of paper.items) {
     const t = inPaper.get(q.topic) ?? { section, questions: 0, targetSec: 0 };
     t.questions += 1;
-    t.targetSec += q.time;
+    t.targetSec += targetSec;
     inPaper.set(q.topic, t);
   }
   const past = new Map<string, { attempted: number; correct: number; timeMs: number }>();

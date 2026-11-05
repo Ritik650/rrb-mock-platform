@@ -1,5 +1,6 @@
 import { db } from './db';
 import { parseBundle } from './importer';
+import { targetScaleFor } from '../lib/sectionTiming';
 import type { Block, Bundle, Mock, Question } from '../types';
 import bundleUrl from '../../data/rrb_po_prelims_20_mocks.json?url';
 
@@ -17,7 +18,8 @@ export interface BankEntry {
 
 export interface Bank {
   mocks: Mock[];
-  blocks: Map<string, { block: Block; mock: Mock }>;
+  /** `targetScale` is how far the block's targets are shortened in its own mock. */
+  blocks: Map<string, { block: Block; mock: Mock; targetScale: number }>;
   questions: Map<string, BankEntry>;
 }
 
@@ -71,12 +73,13 @@ export function ensureSeeded(): Promise<void> {
 }
 
 export function buildBank(mocks: Mock[]): Bank {
-  const blocks = new Map<string, { block: Block; mock: Mock }>();
+  const blocks: Bank['blocks'] = new Map();
   const questions = new Map<string, BankEntry>();
   for (const mock of mocks) {
+    const scale = targetScaleFor(mock);
     for (const section of mock.sections) {
       for (const block of section.blocks) {
-        blocks.set(block.id, { block, mock });
+        blocks.set(block.id, { block, mock, targetScale: scale(section.name) });
         for (const q of block.qs) questions.set(q.id, { q, block, mock });
       }
     }

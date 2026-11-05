@@ -2,7 +2,7 @@ import { AppShell } from '../components/common/AppShell';
 import { ErrorNote, Loading, SectionTitle } from '../components/common/ui';
 import { ScoreTrend } from '../components/dashboard/ScoreTrend';
 import { TimeVsTarget, TopicTrends } from '../components/dashboard/TopicCharts';
-import { submittedAttempts } from '../data/attemptStore';
+import { attemptsForProgress } from '../data/attemptStore';
 import { useSettings } from '../data/settings';
 import { formatDate, formatScore } from '../lib/format';
 import { scoreSeries, topicTimes, topicTrends, totals } from '../lib/progress';
@@ -19,7 +19,7 @@ function Tile({ label, value }: { label: string; value: string }) {
 
 export function DashboardPage() {
   const [settings] = useSettings();
-  const { data: attempts, error } = useAsync(submittedAttempts, []);
+  const { data: attempts, error } = useAsync(attemptsForProgress, []);
 
   const content = () => {
     if (!attempts || !settings) return null;
